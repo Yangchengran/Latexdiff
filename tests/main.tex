@@ -1,8 +1,9 @@
 \documentclass{article}
 \usepackage[utf8]{inputenc}
-\usepackage{amsmath} % 数学公式支持
+\usepackage{amsmath}
 
-\title{My Git LaTeX Diff Test}
+% 1. 修改了标题
+\title{My \textbf{Awesome} Git LaTeX Diff Test} 
 \author{Test User}
 \date{\today}
 
@@ -11,13 +12,16 @@
 \maketitle
 
 \section{Introduction}
-This is a simple document to test the python script. 
+% 2. 修改了文本：删除了 "simple"，加了 "very cool"
+This is a \textbf{very cool} document to test the python script. 
 We want to see if deletions and additions work correctly.
+I added this new sentence here.
 
 \section{Math}
 Pythagoras theorem is:
 \begin{equation}
-    a^2 + b^2 = c^2
+    % 3. 修改了公式
+    a^2 + b^2 = \mathbf{C}^2 
 \end{equation}
 
 \end{document}
