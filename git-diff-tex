@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+import tempfile
+import shutil
+import os
+import sys
+
+def get_git_content(commit, filename, output_path):
+    """
+    从 Git 历史中提取文件内容并写入 output_path
+    """
+    try:
+        # git show commit:filename
+        content = subprocess.check_output(
+            ["git", "show", f"{commit}:{filename}"], 
+            stderr=subprocess.PIPE
+        )
+        with open(output_path, "wb") as f:
+            f.write(content)
+        return True
+    except subprocess.CalledProcessError:
+        print(f"❌ 错误: 在版本 {commit} 中找不到文件 {filename}")
+        return False
+
+def main():
+    parser = argparse.ArgumentParser(description="LaTeX 多模式对比工具")
+    parser.add_argument("filename", help="文件名 (例如 main.tex)")
+    
+    # 这里我们要灵活处理参数
+    parser.add_argument("old_commit", help="旧版本 Commit (例如 HEAD~1)", nargs="?", default="HEAD~1")
+    parser.add_argument("new_commit", help="新版本 Commit (可选，不填则对比当前硬盘文件)", nargs="?")
+    
+    args = parser.parse_args()
+
+    cwd = os.getcwd()
+    output_pdf = "diff.pdf"
+
+    # 1. 创建临时沙盒
+    with tempfile.TemporaryDirectory() as temp_dir:
+        print(f"🔧 正在准备对比环境...")
+
+        # --- 准备旧文件 ---
+        old_file_path = os.path.join(temp_dir, "old.tex")
+        print(f"📥 提取旧版本: {args.old_commit}")
+        if not get_git_content(args.old_commit, args.filename, old_file_path):
+            sys.exit(1)
+
+        # --- 准备新文件 ---
+        new_file_path = ""
+        
+        if args.new_commit:
+            # 模式 A: 指定了两个 commit (Commit vs Commit)
+            print(f"📥 提取新版本: {args.new_commit}")
+            new_file_path = os.path.join(temp_dir, "new.tex")
+            if not get_git_content(args.new_commit, args.filename, new_file_path):
+                sys.exit(1)
+        else:
+            # 模式 B: 只指定了一个 (Commit vs WorkTree)
+            print(f"📂 使用当前工作区文件作为新版本")
+            new_file_path = os.path.join(cwd, args.filename)
+
+        # 2. 运行 latexdiff
+        print("📝 正在生成 Diff TeX...")
+        diff_tex_path = os.path.join(temp_dir, "diff.tex")
+        
+        # 运行 latexdiff
+        # 注意：这里我们加上 --flatten 以防万一你有 input，虽然单文件通常不需要
+        cmd_diff = f"latexdiff {old_file_path} {new_file_path} > {diff_tex_path}"
+        try:
+            subprocess.run(cmd_diff, shell=True, check=True, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            print("❌ latexdiff 运行失败，可能是文件差异过大或语法问题。")
+            sys.exit(1)
+
+        # 3. 编译 PDF
+        print("⚙️  正在编译 PDF...")
+        
+        # 核心技巧：即便两个文件都在 temp 目录，我们依然要把 TEXINPUTS 指向 cwd
+        # 这样两个历史版本里的图片引用都能找到
+        env = os.environ.copy()
+        env['TEXINPUTS'] = f".:{cwd}:" 
+
+        compile_cmd = ["pdflatex", "-interaction=nonstopmode", "diff.tex"]
+        
+        try:
+            # 跑两次以修正引用
+            subprocess.run(compile_cmd, cwd=temp_dir, env=env, stdout=subprocess.DEVNULL)
+            subprocess.run(compile_cmd, cwd=temp_dir, env=env, stdout=subprocess.DEVNULL)
+        except Exception:
+            print("❌ 编译失败")
+            sys.exit(1)
+
+        # 4. 取回结果
+        generated_pdf = os.path.join(temp_dir, "diff.pdf")
+        if os.path.exists(generated_pdf):
+            shutil.move(generated_pdf, os.path.join(cwd, output_pdf))
+            print(f"✅ 成功！Diff 文件已生成: {output_pdf}")
+            if args.new_commit:
+                print(f"   (对比范围: {args.old_commit} <--> {args.new_commit})")
+            else:
+                print(f"   (对比范围: {args.old_commit} <--> 当前硬盘文件)")
+        else:
+            print("❌ 未生成 PDF。")
+
+if __name__ == "__main__":
+    main()
