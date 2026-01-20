@@ -25,8 +25,9 @@
 
 3. 安装 Python 依赖（如果有）：
    ```bash
-   pip install -e .
+   uv sync
    ```
+
 
 ## 使用方法
 
