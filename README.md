@@ -69,6 +69,3 @@ python git-diff-tex <filename> [old_commit] [new_commit]
 - 如果 LaTeX 文件包含外部引用（如图片），确保它们在当前目录或 TEXINPUTS 路径中可用。
 - 如果编译失败，检查 LaTeX 语法和依赖。
 
-## 许可证
-
-[添加许可证信息，如果有的话]
